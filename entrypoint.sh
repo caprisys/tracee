@@ -67,7 +67,7 @@ run_tracee_rules() {
 
     # start tracee-ebpf
 
-    events=$($TRACEE_RULES_EXE $RULES --list-events)
+    events=$($TRACEE_RULES_EXE --list-events)
 
     echo "INFO: starting tracee-ebpf..."
     ${TRACEE_EBPF_EXE} \
@@ -76,8 +76,6 @@ run_tracee_rules() {
         --output=option:parse-arguments \
         --cache cache-type=mem \
         --cache mem-cache-size=512 \
-        --containers=${CONTAINERS_ENRICHMENT:="0"}\
-        --allow-high-capabilities=${ALLOW_HIGH_CAPABILITIES:="0"}\
         --trace event=${events} \
         --output=out-file:${TRACEE_PIPE} &
     tracee_ebpf_pid=$!
@@ -85,11 +83,7 @@ run_tracee_rules() {
     # start tracee-rules
 
     echo "INFO: starting tracee-rules..."
-    $TRACEE_RULES_EXE\
-        --metrics --input-tracee=file:${TRACEE_PIPE}\
-        --input-tracee=format:gob\
-        --allow-high-capabilities=${ALLOW_HIGH_CAPABILITIES:="0"}\
-        $@
+    $TRACEE_RULES_EXE --metrics --input-tracee=file:${TRACEE_PIPE} --input-tracee=format:gob $@
     TRACEE_RET=$?
 }
 
@@ -107,44 +101,13 @@ if [ ! -x ${TRACEE_RULES_EXE} ]; then
     exit 1
 fi
 
-# docker 1st argument might be "trace" only (so tracee-ebpf is executed)
-if [ "${1}" == "trace" ]; then
-    TRACEE_EBPF_ONLY=1
-    shift
-fi
-
-RULES=""
-IN_RULES=""
-
 for arg in ${@}; do
-    if [ -n "${IN_RULES}" ]; then
-        RULES="${RULES} ${arg}"
-        IN_RULES=""
-    fi
-
     case ${arg} in
-    "-r" | "--rules")
-        RULES="${RULES} ${arg}"
-        IN_RULES="yes"
-        ;;
-    "-h" | "--help")
+    "--help")
         if [ ${TRACEE_EBPF_ONLY} -eq 1 ]; then
             ${TRACEE_EBPF_EXE} --help
         else
             ${TRACEE_RULES_EXE} --help
-        fi
-
-        exit $?
-        ;;
-    "--list-events")
-        ${TRACEE_RULES_EXE} ${RULES} --list-events
-        exit $?
-        ;;
-    "-l" | "--list")
-        if [ ${TRACEE_EBPF_ONLY} -eq 1 ]; then
-            ${TRACEE_EBPF_EXE} --list
-        else
-            ${TRACEE_RULES_EXE} --list
         fi
 
         exit $?
